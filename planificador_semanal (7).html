@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Planificador semanal de entreno</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#fdfbff;
+    --panel-2:#f6f2fb;
+    --line:#ebe3f4;
+    --text:#4a4458;
+    --muted:#a89cb8;
+
+    --low:#7fcbb3;    --low-bg:#eafbf5;
+    --mid:#f0c36d;    --mid-bg:#fff7e4;
+    --high:#e58b90;   --high-bg:#ffeef0;
+    --rest:#b7a6e0;   --rest-bg:#f3efFD;
+    --extra:#8fc1e8;  --extra-bg:#eef7fe;
+
+    --lock:#c9e4c5;   --lock-bg:#f2faf0; --lock-text:#4c7a4a;
+    --select:#d68fc7; --select-bg:#fdeefa;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    padding:24px 16px 90px;
+    min-height:100vh;
+  }
+  h1{
+    font-family:'Quicksand',sans-serif;
+    font-weight:700;
+    font-size:24px;
+    margin:0 0 4px;
+  }
+  .subtitle{
+    color:var(--muted);
+    font-size:13px;
+    margin:0 0 20px;
+    max-width:640px;
+    line-height:1.55;
+  }
+  .weekbar{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    flex-wrap:wrap;
+    gap:12px;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:14px 16px;
+    margin-bottom:18px;
+  }
+  .weekbar .range{
+    font-family:'Quicksand',sans-serif;
+    font-weight:700;
+    font-size:14.5px;
+  }
+  .weekbar .storage-note{ font-size:11px; color:var(--muted); margin-top:2px; }
+  .btns{ display:flex; gap:8px; flex-wrap:wrap; }
+  button{
+    font-family:'Inter',sans-serif;
+    font-size:12.5px;
+    font-weight:600;
+    padding:9px 14px;
+    border-radius:20px;
+    border:1.5px solid var(--line);
+    background:#fff;
+    color:var(--text);
+    cursor:pointer;
+    transition:transform .1s, box-shadow .15s, background .15s;
+    -webkit-appearance:none;
+  }
+  button:hover{ background:var(--panel-2); }
+  button:active{ transform:scale(.96); }
+  button.primary{ border-color:var(--rest); background:var(--rest-bg); }
+  button.danger{ border-color:var(--high); color:#a2454b; background:var(--high-bg); }
+
+  .load-summary{ display:flex; gap:14px; font-size:12px; color:var(--muted); flex-wrap:wrap; margin-bottom:14px; }
+  .load-summary span.dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align:middle; }
+
+  .history-panel{ display:none; background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:14px 16px; margin-bottom:20px; font-size:13px; }
+  .history-panel.open{ display:block; }
+  .history-item{ display:flex; justify-content:space-between; gap:10px; padding:6px 0; border-bottom:1px dashed var(--line); }
+  .history-item:last-child{ border-bottom:none; }
+  .history-empty{ color:var(--muted); font-style:italic; }
+
+  .legend{ display:flex; gap:14px; font-size:11.5px; color:var(--muted); flex-wrap:wrap; margin-bottom:18px; }
+  .legend .item{ display:flex; align-items:center; gap:6px; }
+  .legend .sw{ width:11px; height:11px; border-radius:5px; border:1.5px solid; flex-shrink:0; }
+
+  #exportArea{ padding:2px; }
+  .track-wrap{ overflow-x:auto; padding-bottom:8px; -webkit-overflow-scrolling:touch; }
+  .track{
+    display:grid;
+    grid-template-columns:repeat(7, minmax(150px,1fr));
+    gap:12px;
+    align-items:start;
+  }
+  @media (max-width:820px){
+    .track{ grid-template-columns:1fr; min-width:0; }
+    .track-wrap{ overflow-x:visible; }
+  }
+
+  .day-card{
+    border:1px solid var(--line);
+    border-radius:16px;
+    background:#fff;
+    overflow:hidden;
+  }
+  .day-head{
+    padding:10px 12px 8px;
+    background:var(--panel-2);
+    border-bottom:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .day-head .names{ display:flex; flex-direction:column; }
+  .day-head .n{ font-family:'Quicksand',sans-serif; font-weight:700; font-size:14.5px; }
+  .day-head .d{ font-size:11px; color:var(--muted); }
+  .lock-btn{ font-size:10.5px; padding:5px 10px; border-radius:14px; }
+  .day-body{ display:flex; flex-direction:column; gap:8px; padding:8px; }
+  .day-card.locked .day-body{ background:var(--lock-bg); }
+  .locked-banner{
+    font-size:11px; color:var(--lock-text); background:var(--lock);
+    border-radius:8px; padding:5px 8px; text-align:center; font-weight:600;
+  }
+  .locked-banner .undo{ text-decoration:underline; cursor:pointer; font-weight:500; margin-left:6px; }
+
+  .slot{
+    border:1.5px dashed var(--line); border-radius:12px; padding:6px;
+    display:flex; flex-direction:column; gap:5px;
+    transition:border-color .15s, background .15s;
+    min-height:44px;
+  }
+  .slot.morning{ flex:1 1 0; }
+  .slot.afternoon{ flex:2 1 0; }
+  .slot .placeholder{ font-size:10.5px; color:var(--muted); text-align:center; padding:4px 0; }
+  .slot.dragover, .slot.tap-target{ border-color:var(--select); background:var(--select-bg); }
+
+  .full-slot{
+    border:1.5px dashed var(--line); border-radius:12px; padding:6px;
+    display:flex; flex-direction:column; gap:5px; min-height:26px;
+  }
+  .full-slot.dragover, .full-slot.tap-target{ border-color:var(--select); background:var(--select-bg); }
+  .full-slot .placeholder{ font-size:10px; color:var(--muted); text-align:center; padding:2px 0; }
+
+  .chip{
+    border:1.5px solid; border-radius:9px; padding:6px 8px;
+    display:flex; align-items:flex-start; justify-content:space-between; gap:6px;
+    cursor:pointer;
+  }
+  .chip.selected{ outline:2px solid var(--select); }
+  .chip .name{ font-size:11.5px; font-weight:600; line-height:1.25; }
+  .chip .remove-x{ font-size:13px; color:inherit; opacity:.55; cursor:pointer; flex-shrink:0; padding:0 2px; }
+  .chip .remove-x:hover{ opacity:1; }
+  .chip.locked-chip{ cursor:default; opacity:.9; }
+
+  .low-c   { border-color:var(--low);  background:var(--low-bg); }
+  .mid-c   { border-color:var(--mid);  background:var(--mid-bg); }
+  .high-c  { border-color:var(--high); background:var(--high-bg); }
+  .rest-c  { border-color:var(--rest); background:var(--rest-bg); }
+  .extra-c { border-color:var(--extra); background:var(--extra-bg); }
+
+  .bench-title{ font-family:'Quicksand',sans-serif; font-weight:700; font-size:16.5px; margin:28px 0 4px; }
+  .bench-sub{ font-size:12.5px; color:var(--muted); margin:0 0 14px; }
+  .bench-groups{ display:flex; flex-direction:column; gap:14px; }
+  .bench-row{
+    display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap;
+    background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:12px 14px;
+  }
+  .bench-label{ font-size:11.5px; font-weight:600; color:var(--muted); width:120px; flex-shrink:0; padding-top:8px; }
+  .bench-items{ display:flex; gap:9px; flex-wrap:wrap; flex:1; }
+  .source-chip{
+    border:1.5px solid; border-radius:20px; font-weight:600; cursor:pointer; color:var(--text);
+    padding:9px 14px; font-size:12px; display:flex; align-items:center; gap:6px; user-select:none;
+  }
+  .source-chip.selected{ outline:2px solid var(--select); }
+  .source-chip .del{ font-size:11px; opacity:.5; cursor:pointer; }
+  .source-chip .del:hover{ opacity:1; }
+
+  .extra-form{ display:flex; gap:8px; align-items:center; flex:1; min-width:220px; }
+  .extra-form input{
+    flex:1; min-width:150px; padding:9px 12px; border-radius:20px;
+    border:1.5px solid var(--line); font-family:'Inter',sans-serif; font-size:13px; outline:none;
+  }
+  .extra-form input:focus{ border-color:var(--extra); }
+  .extra-form button{ border-color:var(--extra); background:var(--extra-bg); white-space:nowrap; }
+
+  .trash-zone{
+    margin-top:18px; border:1.5px dashed var(--line); border-radius:14px; padding:14px;
+    text-align:center; font-size:12px; color:var(--muted);
+    transition:border-color .15s, background .15s, color .15s;
+  }
+  .trash-zone.dragover, .trash-zone.tap-target{ border-color:var(--high); color:#a2454b; background:var(--high-bg); }
+
+  .select-hint{
+    position:fixed; left:12px; right:12px;
+    bottom:calc(12px + env(safe-area-inset-bottom));
+    background:var(--text); color:#fff;
+    border-radius:16px; padding:12px 14px;
+    display:none; align-items:center; justify-content:space-between; gap:10px;
+    font-size:13px; z-index:50; box-shadow:0 6px 20px rgba(74,68,88,.25);
+  }
+  .select-hint.show{ display:flex; }
+  .select-hint button{ background:#fff; color:var(--text); border:none; padding:7px 12px; }
+
+  /* export modal */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(74,68,88,.55);
+    display:none; align-items:center; justify-content:center; z-index:100; padding:20px;
+  }
+  .modal-backdrop.show{ display:flex; }
+  .modal-card{
+    background:#fff; border-radius:18px; padding:16px; max-width:94vw; max-height:90vh;
+    display:flex; flex-direction:column; gap:10px; align-items:center;
+  }
+  .modal-card img{ max-width:88vw; max-height:65vh; border-radius:10px; border:1px solid var(--line); }
+  .modal-card .hint{ font-size:12.5px; color:var(--muted); text-align:center; }
+  .modal-actions{ display:flex; gap:10px; }
+  .modal-actions a, .modal-actions button{ text-decoration:none; }
+
+  /* hide interactive chrome while capturing the export image */
+  .exporting .weekbar .btns{ visibility:hidden; }
+  .exporting .storage-note{ visibility:hidden; }
+  .exporting .lock-btn{ visibility:hidden; }
+  .exporting .remove-x{ visibility:hidden; }
+  .exporting .locked-banner .undo{ visibility:hidden; }
+
+  @media (max-width:480px){
+    .bench-label{ width:auto; padding-top:0; }
+    h1{ font-size:21px; }
+    .weekbar{ flex-direction:column; align-items:flex-start; }
+  }
+</style>
+</head>
+<body>
+
+  <h1>🌷 Planificador semanal</h1>
+  <p class="subtitle">Toca un pendiente y luego el hueco donde quieras colocarlo (o arrástralo si usas ratón). Repite la misma actividad las veces que quieras. Marca cada día como completo cuando acabes, y exporta la semana en cualquier momento.</p>
+
+  <div class="weekbar">
+    <div>
+      <div class="range" id="weekRange">Semana</div>
+      <div class="storage-note" id="storageNote"></div>
+    </div>
+    <div class="btns">
+      <button id="prevWeekBtn">◀ Anterior</button>
+      <button id="todayWeekBtn">Hoy</button>
+      <button id="nextWeekBtn">Siguiente ▶</button>
+      <button id="copyPrevBtn">📋 Copiar semana anterior</button>
+      <button id="historyBtn">📖 Historial</button>
+      <button id="exportBtn">🖼️ Exportar</button>
+      <button id="resetBtn">🧹 Vaciar</button>
+      <button class="primary" id="closeWeekBtn">✅ Cerrar y pasar página</button>
+    </div>
+  </div>
+
+  <div class="history-panel" id="historyPanel"></div>
+
+  <div id="exportArea">
+    <div class="load-summary" id="loadSummary"></div>
+    <div class="legend">
+      <div class="item"><span class="sw" style="border-color:var(--low); background:var(--low-bg);"></span>🌱 Baja</div>
+      <div class="item"><span class="sw" style="border-color:var(--mid); background:var(--mid-bg);"></span>⚡ Media</div>
+      <div class="item"><span class="sw" style="border-color:var(--high); background:var(--high-bg);"></span>🔥 Alta</div>
+      <div class="item"><span class="sw" style="border-color:var(--rest); background:var(--rest-bg);"></span>🌙 Día completo</div>
+      <div class="item"><span class="sw" style="border-color:var(--extra); background:var(--extra-bg);"></span>📝 Extra</div>
+    </div>
+    <div class="track-wrap">
+      <div class="track" id="track"></div>
+    </div>
+  </div>
+
+  <h2 class="bench-title">Pendientes</h2>
+  <p class="bench-sub">El banquillo no se vacía: toca (o arrastra) tantas copias como quieras a lo largo de la semana.</p>
+  <div class="bench-groups" id="bench"></div>
+
+  <div class="trash-zone" id="trash">Suelta aquí, o toca tras seleccionar algo programado, para quitarlo del plan</div>
+
+  <div class="select-hint" id="selectHint">
+    <span id="selectHintText"></span>
+    <button id="selectCancel">Cancelar</button>
+  </div>
+
+  <div class="modal-backdrop" id="exportModal">
+    <div class="modal-card">
+      <img id="exportImg" alt="Semana exportada" />
+      <div class="hint">Mantén pulsada la imagen para guardarla en Fotos, o usa el botón de descarga.</div>
+      <div class="modal-actions">
+        <a id="downloadLink" download="semana.png"><button class="primary">⬇️ Descargar</button></a>
+        <button id="closeModal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+const BASE_ITEMS = [
+  {id:'carrera',    name:"Carrera suave 30'",              size:'s', cls:'low-c',  group:'s'},
+  {id:'natacion',   name:'Natación',                        size:'s', cls:'low-c',  group:'s'},
+  {id:'row',        name:'Row / SkiErg',                    size:'s', cls:'low-c',  group:'s'},
+  {id:'movilidad',  name:'Movilidad',                       size:'s', cls:'low-c',  group:'s'},
+  {id:'yoga_pilates', name:'Yoga / Pilates',                size:'s', cls:'low-c',  group:'s'},
+
+  {id:'fartlek',    name:'Fartlek',                         size:'m', cls:'mid-c',  group:'m'},
+  {id:'fuerza_sup', name:'Fuerza tren superior + wallballs', size:'m', cls:'mid-c',  group:'m'},
+  {id:'cross',      name:'Clase cross / hybrid',            size:'m', cls:'mid-c',  group:'m'},
+  {id:'core_hiit',  name:'Core-HIIT',                       size:'m', cls:'mid-c',  group:'m'},
+
+  {id:'fuerza_inf', name:'Fuerza tren inferior',            size:'l', cls:'high-c', group:'l'},
+  {id:'tirada',     name:'Tirada larga',                    size:'l', cls:'high-c', group:'l'},
+  {id:'hyrox',      name:'Circuito Hyrox',                  size:'l', cls:'high-c', group:'l'},
+
+  {id:'descanso',   name:'Descanso + Pilates / Yoga',       size:'full', cls:'rest-c', group:'full'},
+];
+const GROUP_LABEL = {s:'🌱 Baja demanda', m:'⚡ Media demanda', l:'🔥 Alta demanda', full:'🌙 Día completo', extra:'📝 Extra / nota'};
+const DAYS = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+
+let customItems = [];
+let schedule = {};
+let weekStart = null;
+let selection = null; // {type:'backlog', itemId} | {type:'slot', instanceId, day, period}
+
+const hasStorage = (typeof window !== 'undefined') && window.storage && typeof window.storage.get === 'function';
+
+function itemMap(){
+  const m = {};
+  BASE_ITEMS.forEach(i=>m[i.id]=i);
+  customItems.forEach(i=>m[i.id]=i);
+  return m;
+}
+function toLocalISO(dt){
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth()+1).padStart(2,'0');
+  const day = String(dt.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function getMondayISO(d){
+  const dt = new Date(d);
+  const day = dt.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  dt.setDate(dt.getDate() + diff);
+  dt.setHours(0,0,0,0);
+  return toLocalISO(dt);
+}
+function addDays(iso, n){ const dt = new Date(iso + 'T00:00:00'); dt.setDate(dt.getDate()+n); return dt; }
+function fmtLong(dt){ return dt.toLocaleDateString('es-ES', {day:'numeric', month:'long', year:'numeric'}); }
+function fmtShort(dt){ return dt.toLocaleDateString('es-ES', {day:'numeric', month:'short'}); }
+function emptySchedule(){ const s = {}; DAYS.forEach(d => s[d] = {morning:[], afternoon:[], full:[], locked:false}); return s; }
+
+async function storageGet(key){
+  if(!hasStorage) return null;
+  try{ const r = await window.storage.get(key, false); return r ? JSON.parse(r.value) : null; }catch(e){ return null; }
+}
+async function storageSet(key, value){
+  if(!hasStorage) return;
+  try{ await window.storage.set(key, JSON.stringify(value), false); }catch(e){}
+}
+async function storageList(prefix){
+  if(!hasStorage) return [];
+  try{ const r = await window.storage.list(prefix, false); return r ? r.keys : []; }catch(e){ return []; }
+}
+async function saveCurrentWeek(){
+  await storageSet(`week:${weekStart}`, {weekStart, schedule});
+  await storageSet('last-week-pointer', weekStart);
+}
+async function saveCustomItems(){ await storageSet('custom-items', customItems); }
+
+async function loadWeek(iso){
+  clearSelectionSilent();
+  const saved = await storageGet(`week:${iso}`);
+  weekStart = iso;
+  if(saved && saved.schedule){
+    schedule = saved.schedule;
+    DAYS.forEach(d=>{
+      schedule[d] = schedule[d] || {morning:[],afternoon:[],full:[],locked:false};
+      schedule[d].morning = schedule[d].morning || [];
+      schedule[d].afternoon = schedule[d].afternoon || [];
+      schedule[d].full = schedule[d].full || [];
+    });
+  } else {
+    schedule = emptySchedule();
+  }
+  await storageSet('last-week-pointer', weekStart);
+  renderWeekbar();
+  render();
+}
+function clearSelectionSilent(){ selection = null; updateSelectHint(); }
+
+function newInstance(item){
+  return { instanceId: 'i_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+    itemId: item.id, name: item.name, size: item.size, cls: item.cls };
+}
+
+// ---------- selection (tap-to-place) ----------
+function setSelection(sel){
+  selection = sel;
+  updateSelectHint();
+  render();
+  buildBench();
+}
+function clearSelection(){ setSelection(null); }
+function updateSelectHint(){
+  const hint = document.getElementById('selectHint');
+  const text = document.getElementById('selectHintText');
+  if(!selection){ hint.classList.remove('show'); return; }
+  text.textContent = selection.type === 'backlog'
+    ? `Colocando "${selection.name}" · toca un hueco`
+    : `Moviendo "${selection.name}" · toca el hueco destino`;
+  hint.classList.add('show');
+}
+
+function placeInto(targetDay, targetPeriod){
+  if(!selection || schedule[targetDay].locked) return;
+  const map = itemMap();
+  if(selection.type === 'backlog'){
+    const item = map[selection.itemId];
+    if(!item) return;
+    const inst = newInstance(item);
+    schedule[targetDay][item.size === 'full' ? 'full' : targetPeriod].push(inst);
+  } else {
+    if(schedule[selection.day].locked) return;
+    const originArr = schedule[selection.day][selection.period];
+    const idx = originArr.findIndex(i => i.instanceId === selection.instanceId);
+    if(idx === -1){ clearSelection(); return; }
+    const [moved] = originArr.splice(idx, 1);
+    schedule[targetDay][moved.size === 'full' ? 'full' : targetPeriod].push(moved);
+    clearSelection();
+  }
+  saveCurrentWeek();
+  if(selection && selection.type === 'backlog'){ render(); buildBench(); } // keep selection active for rapid placement
+}
+
+function removeInstance(day, period, instanceId){
+  schedule[day][period] = schedule[day][period].filter(i => i.instanceId !== instanceId);
+  saveCurrentWeek();
+}
+
+// ---------- drag (desktop mouse) ----------
+function attachSourceDrag(el, item){
+  el.draggable = true;
+  el.addEventListener('dragstart', e=>{
+    e.dataTransfer.setData('text/plain', JSON.stringify({itemId:item.id, source:'backlog'}));
+  });
+}
+function attachChipDrag(el, instance, day, period){
+  el.draggable = true;
+  el.addEventListener('dragstart', e=>{
+    e.dataTransfer.setData('text/plain', JSON.stringify({
+      instanceId: instance.instanceId, itemId: instance.itemId, source:'slot', day, period
+    }));
+  });
+}
+function attachDropTarget(el, day, period){
+  if(schedule[day].locked) return;
+  el.addEventListener('dragover', e=>{ e.preventDefault(); el.classList.add('dragover'); });
+  el.addEventListener('dragleave', ()=> el.classList.remove('dragover'));
+  el.addEventListener('drop', e=>{
+    e.preventDefault();
+    el.classList.remove('dragover');
+    const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+    handleExternalDrop(data, day, period);
+  });
+  el.addEventListener('click', ()=> placeInto(day, period));
+}
+function handleExternalDrop(data, targetDay, targetPeriod){
+  if(schedule[targetDay].locked) return;
+  const map = itemMap();
+  if(data.source === 'slot'){
+    if(schedule[data.day].locked) return;
+    const originArr = schedule[data.day][data.period];
+    const idx = originArr.findIndex(i => i.instanceId === data.instanceId);
+    if(idx === -1) return;
+    const [moved] = originArr.splice(idx, 1);
+    schedule[targetDay][moved.size === 'full' ? 'full' : targetPeriod].push(moved);
+  } else {
+    const item = map[data.itemId];
+    if(!item) return;
+    const inst = newInstance(item);
+    schedule[targetDay][item.size === 'full' ? 'full' : targetPeriod].push(inst);
+  }
+  saveCurrentWeek();
+  render();
+}
+
+// ---------- render ----------
+function renderWeekbar(){
+  const start = new Date(weekStart + 'T00:00:00');
+  const end = addDays(weekStart, 6);
+  document.getElementById('weekRange').textContent = `Semana del ${fmtShort(start)} al ${fmtLong(end)}`;
+  document.getElementById('storageNote').textContent = hasStorage
+    ? 'Tus cambios se guardan automáticamente.'
+    : 'El almacenamiento no está disponible aquí: los cambios no se guardarán al cerrar.';
+}
+
+function chipEl(instance, day, period){
+  const locked = schedule[day].locked;
+  const isSelected = selection && selection.type==='slot' && selection.instanceId===instance.instanceId;
+  const el = document.createElement('div');
+  el.className = `chip ${instance.cls}` + (locked ? ' locked-chip' : '') + (isSelected ? ' selected' : '');
+  el.innerHTML = `<span class="name">${instance.name}</span>` + (locked ? '' : `<span class="remove-x">✕</span>`);
+  if(!locked){
+    attachChipDrag(el, instance, day, period);
+    el.querySelector('.name').addEventListener('click', (e)=>{
+      e.stopPropagation();
+      if(isSelected){ clearSelection(); return; }
+      setSelection({type:'slot', instanceId:instance.instanceId, itemId:instance.itemId, day, period, name:instance.name});
+    });
+    el.querySelector('.remove-x').addEventListener('click', (e)=>{
+      e.stopPropagation();
+      removeInstance(day, period, instance.instanceId);
+      if(selection && selection.instanceId===instance.instanceId) clearSelection();
+      render();
+    });
+  }
+  return el;
+}
+
+function buildDayCard(day, idx){
+  const d = schedule[day];
+  const dt = addDays(weekStart, idx);
+  const card = document.createElement('div');
+  card.className = 'day-card' + (d.locked ? ' locked' : '');
+
+  const head = document.createElement('div');
+  head.className = 'day-head';
+  head.innerHTML = `<div class="names"><span class="n">${day}</span><span class="d">${fmtShort(dt)}</span></div>`;
+  if(!d.locked){
+    const lockBtn = document.createElement('button');
+    lockBtn.className = 'lock-btn';
+    lockBtn.textContent = '✔️ Completo';
+    lockBtn.addEventListener('click', ()=>{ d.locked = true; saveCurrentWeek(); render(); });
+    head.appendChild(lockBtn);
+  }
+  card.appendChild(head);
+
+  const body = document.createElement('div');
+  body.className = 'day-body';
+
+  if(d.locked){
+    const banner = document.createElement('div');
+    banner.className = 'locked-banner';
+    banner.innerHTML = `✔️ Día completo <span class="undo">reabrir</span>`;
+    banner.querySelector('.undo').addEventListener('click', ()=>{
+      if(confirm(`¿Reabrir ${day}? Podrás volver a modificarlo.`)){ d.locked = false; saveCurrentWeek(); render(); }
+    });
+    body.appendChild(banner);
+  }
+
+  const fullZone = document.createElement('div');
+  fullZone.className = 'full-slot';
+  if(selection && !d.locked) fullZone.classList.add('tap-target');
+  if(d.full.length === 0){ fullZone.innerHTML = `<span class="placeholder">Día entero</span>`; }
+  else { d.full.forEach(inst => fullZone.appendChild(chipEl(inst, day, 'full'))); }
+  attachDropTarget(fullZone, day, 'full');
+  body.appendChild(fullZone);
+
+  ['morning','afternoon'].forEach(period=>{
+    const slot = document.createElement('div');
+    slot.className = `slot ${period}`;
+    if(selection && !d.locked) slot.classList.add('tap-target');
+    const items = d[period];
+    if(items.length === 0){ slot.innerHTML = `<span class="placeholder">${period==='morning' ? 'Mañana' : 'Tarde'}</span>`; }
+    else { items.forEach(inst => slot.appendChild(chipEl(inst, day, period))); }
+    attachDropTarget(slot, day, period);
+    body.appendChild(slot);
+  });
+
+  card.appendChild(body);
+  return card;
+}
+
+function render(){
+  const track = document.getElementById('track');
+  track.innerHTML = '';
+  DAYS.forEach((day, idx)=> track.appendChild(buildDayCard(day, idx)));
+  renderSummary();
+}
+
+function renderSummary(){
+  const counts = {s:0,m:0,l:0,full:0,extra:0};
+  DAYS.forEach(day=>{
+    const d = schedule[day];
+    ['morning','afternoon','full'].forEach(p=>{
+      d[p].forEach(inst=>{
+        const key = inst.size === 'extra' ? 'extra' : inst.size;
+        counts[key] = (counts[key]||0) + 1;
+      });
+    });
+  });
+  document.getElementById('loadSummary').innerHTML = `
+    <span><span class="dot" style="background:var(--low)"></span>${counts.s} baja</span>
+    <span><span class="dot" style="background:var(--mid)"></span>${counts.m} media</span>
+    <span><span class="dot" style="background:var(--high)"></span>${counts.l} alta</span>
+    <span><span class="dot" style="background:var(--rest)"></span>${counts.full} descanso</span>
+    <span><span class="dot" style="background:var(--extra)"></span>${counts.extra} extra</span>
+  `;
+}
+
+function sourceChip(item){
+  const chip = document.createElement('div');
+  const isSelected = selection && selection.type==='backlog' && selection.itemId===item.id;
+  chip.className = `source-chip ${item.cls}` + (isSelected ? ' selected' : '');
+  const span = document.createElement('span');
+  span.textContent = item.name;
+  chip.appendChild(span);
+  attachSourceDrag(chip, item);
+  span.addEventListener('click', ()=>{
+    if(isSelected){ clearSelection(); return; }
+    setSelection({type:'backlog', itemId:item.id, name:item.name});
+  });
+  return chip;
+}
+
+function buildBench(){
+  const bench = document.getElementById('bench');
+  bench.innerHTML = '';
+  ['s','m','l','full'].forEach(groupKey=>{
+    const row = document.createElement('div');
+    row.className = 'bench-row';
+    row.innerHTML = `<div class="bench-label">${GROUP_LABEL[groupKey]}</div>`;
+    const items = document.createElement('div');
+    items.className = 'bench-items';
+    BASE_ITEMS.filter(i=>i.group===groupKey).forEach(item=> items.appendChild(sourceChip(item)));
+    row.appendChild(items);
+    bench.appendChild(row);
+  });
+
+  const extraRow = document.createElement('div');
+  extraRow.className = 'bench-row';
+  extraRow.innerHTML = `<div class="bench-label">${GROUP_LABEL.extra}</div>`;
+  const extraItems = document.createElement('div');
+  extraItems.className = 'bench-items';
+  customItems.forEach(item=>{
+    const chip = sourceChip(item);
+    const del = document.createElement('span');
+    del.className = 'del';
+    del.textContent = '✕';
+    del.title = 'Quitar de pendientes (no afecta a lo ya programado)';
+    del.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      customItems = customItems.filter(c=>c.id!==item.id);
+      saveCustomItems();
+      buildBench();
+    });
+    chip.appendChild(del);
+    extraItems.appendChild(chip);
+  });
+  extraRow.appendChild(extraItems);
+
+  const form = document.createElement('div');
+  form.className = 'extra-form';
+  form.innerHTML = `<input type="text" placeholder="Ej: fisio, viaje, cumpleaños…" maxlength="40" />
+                     <button>➕ Añadir</button>`;
+  const input = form.querySelector('input');
+  const addBtn = form.querySelector('button');
+  const addExtra = ()=>{
+    const val = input.value.trim();
+    if(!val) return;
+    const item = {id:'extra_'+Date.now()+'_'+Math.random().toString(36).slice(2,5), name:val, size:'extra', cls:'extra-c', group:'extra'};
+    customItems.push(item);
+    saveCustomItems();
+    input.value = '';
+    buildBench();
+  };
+  addBtn.addEventListener('click', addExtra);
+  input.addEventListener('keydown', e=>{ if(e.key==='Enter') addExtra(); });
+  extraRow.appendChild(form);
+
+  bench.appendChild(extraRow);
+}
+
+// ---------- trash ----------
+const trash = document.getElementById('trash');
+trash.addEventListener('dragover', e=>{ e.preventDefault(); trash.classList.add('dragover'); });
+trash.addEventListener('dragleave', ()=> trash.classList.remove('dragover'));
+trash.addEventListener('drop', e=>{
+  e.preventDefault();
+  trash.classList.remove('dragover');
+  const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+  if(data.source === 'slot' && !schedule[data.day].locked){ removeInstance(data.day, data.period, data.instanceId); render(); }
+});
+trash.addEventListener('click', ()=>{
+  if(selection && selection.type === 'slot'){
+    removeInstance(selection.day, selection.period, selection.instanceId);
+    clearSelection();
+    render();
+  }
+});
+
+document.getElementById('selectCancel').addEventListener('click', clearSelection);
+
+// ---------- toolbar ----------
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  if(!confirm('¿Vaciar todos los huecos de esta semana? Los días marcados como completos también se reabrirán.')) return;
+  schedule = emptySchedule();
+  clearSelection();
+  saveCurrentWeek();
+  render();
+});
+
+document.getElementById('prevWeekBtn').addEventListener('click', ()=> loadWeek(getMondayISO(addDays(weekStart, -7))));
+document.getElementById('nextWeekBtn').addEventListener('click', ()=> loadWeek(getMondayISO(addDays(weekStart, 7))));
+document.getElementById('todayWeekBtn').addEventListener('click', ()=> loadWeek(getMondayISO(new Date())));
+
+document.getElementById('copyPrevBtn').addEventListener('click', async ()=>{
+  const hasContent = DAYS.some(d => schedule[d].morning.length || schedule[d].afternoon.length || schedule[d].full.length);
+  if(hasContent && !confirm('Esto sustituirá lo que ya tienes en esta semana por una copia de la semana anterior. ¿Seguir?')) return;
+
+  const prevIso = getMondayISO(addDays(weekStart, -7));
+  const prevWeek = await storageGet(`week:${prevIso}`);
+  if(!prevWeek || !prevWeek.schedule){
+    alert('No hay ninguna semana guardada justo antes de esta para copiar.');
+    return;
+  }
+  const cloned = {};
+  DAYS.forEach(day=>{
+    const src = prevWeek.schedule[day] || {morning:[],afternoon:[],full:[]};
+    const cloneArr = (arr)=> (arr||[]).map(inst => ({
+      instanceId: 'i_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      itemId: inst.itemId, name: inst.name, size: inst.size, cls: inst.cls
+    }));
+    cloned[day] = { morning: cloneArr(src.morning), afternoon: cloneArr(src.afternoon), full: cloneArr(src.full), locked:false };
+  });
+  schedule = cloned;
+  clearSelection();
+  await saveCurrentWeek();
+  render();
+});
+
+document.getElementById('closeWeekBtn').addEventListener('click', async ()=>{
+  if(!confirm('¿Marcar todos los días como completos y pasar a la semana siguiente?')) return;
+  DAYS.forEach(d => schedule[d].locked = true);
+  await saveCurrentWeek();
+  await loadWeek(getMondayISO(addDays(weekStart, 7)));
+});
+
+document.getElementById('historyBtn').addEventListener('click', async ()=>{
+  const panel = document.getElementById('historyPanel');
+  if(panel.classList.contains('open')){ panel.classList.remove('open'); return; }
+  const keys = await storageList('week:');
+  if(!keys || keys.length === 0){
+    panel.innerHTML = `<div class="history-empty">Todavía no hay semanas guardadas.</div>`;
+  } else {
+    const entries = [];
+    for(const k of keys.sort().reverse()){ const v = await storageGet(k); if(v) entries.push(v); }
+    panel.innerHTML = '';
+    entries.forEach(entry=>{
+      let total = 0;
+      Object.values(entry.schedule).forEach(d=>{ ['morning','afternoon','full'].forEach(p=> total += d[p].length); });
+      const start = new Date(entry.weekStart+'T00:00:00');
+      const end = addDays(entry.weekStart, 6);
+      const row = document.createElement('div');
+      row.className = 'history-item';
+      row.style.cursor = 'pointer';
+      row.innerHTML = `<span>${fmtShort(start)} – ${fmtLong(end)}${entry.weekStart===weekStart ? ' (actual)' : ''}</span><span>${total} actividades</span>`;
+      row.addEventListener('click', ()=>{ loadWeek(entry.weekStart); panel.classList.remove('open'); });
+      panel.appendChild(row);
+    });
+  }
+  panel.classList.add('open');
+});
+
+// ---------- export as image ----------
+document.getElementById('exportBtn').addEventListener('click', async ()=>{
+  clearSelection();
+  const area = document.getElementById('exportArea');
+  document.body.classList.add('exporting');
+  try{
+    const canvas = await html2canvas(area, {backgroundColor:'#ffffff', scale:2, useCORS:true});
+    const dataUrl = canvas.toDataURL('image/png');
+    document.getElementById('exportImg').src = dataUrl;
+    const link = document.getElementById('downloadLink');
+    link.href = dataUrl;
+    link.download = `semana_${weekStart}.png`;
+    document.getElementById('exportModal').classList.add('show');
+  } catch(e){
+    alert('No se ha podido generar la imagen. Inténtalo de nuevo.');
+  } finally {
+    document.body.classList.remove('exporting');
+  }
+});
+document.getElementById('closeModal').addEventListener('click', ()=>{
+  document.getElementById('exportModal').classList.remove('show');
+});
+document.getElementById('exportModal').addEventListener('click', (e)=>{
+  if(e.target.id === 'exportModal') e.currentTarget.classList.remove('show');
+});
+
+// ---------- boot ----------
+(async function init(){
+  const savedCustom = await storageGet('custom-items');
+  customItems = savedCustom || [];
+
+  let pointer = await storageGet('last-week-pointer');
+
+  if(!pointer){
+    // migrate from the old single-slot storage scheme, if present
+    const legacy = await storageGet('current-week');
+    if(legacy && legacy.weekStart && legacy.schedule){
+      weekStart = legacy.weekStart;
+      schedule = legacy.schedule;
+      await saveCurrentWeek();
+      pointer = weekStart;
+    }
+  }
+
+  await loadWeek(pointer || getMondayISO(new Date()));
+  buildBench();
+})();
+</script>
+</body>
+</html>
